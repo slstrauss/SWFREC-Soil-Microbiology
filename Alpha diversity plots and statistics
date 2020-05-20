@@ -112,7 +112,6 @@ plot_richness(phylobj.S,
   ggtitle("Alpha Diversity - South block only")
 
 #Alpha diversity statistical analysis
-#This code could be used to identify 
 #------------------
 sample_data(phylobj.N) #Subsetted data for North grove only
 resultsN = estimate_richness(phylobj.N, measures = c("Shannon", "Observed", "InvSimpson", "Chao1"))
