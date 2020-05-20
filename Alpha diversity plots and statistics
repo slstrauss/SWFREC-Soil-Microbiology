@@ -1,0 +1,149 @@
+#Code for analysis of alpha diversity in RStudio, using  sequences (obtained through MiSeq Illumina next-generation sequencing) processed with QIIME2 using "Qiime2 walkthrough for 16S, ITS and beyond" pipeline
+#Analysis of sequence data from Redox project, analyzed separately by block (North or South) and broken down by treatment ("Control", "Deluxe", and "Standard")time point (0 month, 12 month, 24 month)
+#16S sequences only
+
+#Set root directory where files will be accessed
+#------------------
+install.packages('knitr')
+library(knitr)
+opts_knit$set(root.dir = normalizePath("X:/SOILMICRO/Rachel/redox/16S_merged"))
+
+#Install packages
+#------------------
+if (!requireNamespace("BiocManager", quietly = TRUE))
+  install.packages("BiocManager")
+BiocManager::install("phyloseq")
+install.packages('tidyverse')
+install.packages('dummies')
+install.packages('ggthemes')
+install.packages('ggplot2')
+install.packages('installr')
+pkgbuild::find_rtools(debug = TRUE)
+find_rtools(T)
+install.Rtools(choose_version = TRUE, check = FALSE, GUI = TRUE, 
+               page_with_download_url = "https://cran.r-project.org/bin/windows/Rtools/")
+install.packages('digest')
+install.packages('devtools')
+install.packages('adespatial')
+
+#Load packages
+#------------------
+library(installr)
+library(devtools)
+library="C:/Rtools for 3.5"
+library(tidyverse)
+library(ggthemes)
+library(phyloseq)
+library(vegan)
+library(ape)
+library(dummies)
+library(ggplot2)
+library(ggthemes)
+library(dplyr)
+library(digest)
+
+#File paths
+biom_path <- file.path('X:/SOILMICRO/Rachel/redox/16S_merged/biom/table_wo_chl_mit.biom')
+tree_path <- file.path('X:/SOILMICRO/Rachel/redox/16S_merged/features/tree.nwk')
+DESEq2_path <- file.path('X:/SOILMICRO/Rachel/redox/16S_merged/biom/DESeq2_w_tax.biom')
+map_path <- file.path('X:/SOILMICRO/Rachel/redox/16S_merged/features/Metadatanoblank.txt')
+
+#Import to phyloseq table and merge into phyloseq objects
+#------------------
+table <- import_biom(BIOMfilename = biom_path,
+                     #refseqfilename = repseqfile,
+                     parseFunction = parse_taxonomy_default, 
+                     parallel = T)
+
+tax_table(table) <-tax_table(table)[,1:7]
+DESEq2.table <- import_biom(BIOMfilename = DESEq2_path,
+                            #refseqfilename = repseqfile,
+                            parseFunction = parse_taxonomy_default, 
+                            parallel = T)
+
+tax_table(DESEq2.table) <-tax_table(DESEq2.table)[,1:7]
+metadata <- import_qiime_sample_data(map_path)
+print(metadata)
+tree <- read_tree(tree_path)
+phylobj <- merge_phyloseq(table, metadata, tree)
+DESEq2.phylobj <- merge_phyloseq(DESEq2.table, metadata, tree)
+
+#Adjust taxonomy names (to harmonize betwen UNITE and SILVA databases)
+#------------------
+tax_table(phylobj) <- gsub(".*__", "", tax_table(phylobj))
+colnames(tax_table(phylobj)) <- c("Kingdom", "Phylum", "Class", 
+                                  "Order", "Family", "Genus", "Species")
+tax_table(DESEq2.phylobj) <- gsub(".*__", "", tax_table(DESEq2.phylobj))
+colnames(tax_table(DESEq2.phylobj)) <- c("Kingdom", "Phylum", "Class", 
+                                         "Order", "Family", "Genus", "Species")
+
+#Alpha Diversity Richness barplot 
+#------------------
+plot_richness(phylobj, 
+              x = "Treatment", 
+              color = "Time_point", 
+              measures = c('Observed', 'Chao1', 'Shannon')) + 
+  geom_boxplot(alpha=.9) + theme_igray() +
+  theme(axis.text.x  = element_text(angle=90, vjust=0.5)) +
+  scale_color_pander() + scale_fill_pander()
+  
+#Alpha Diversity Richness barplot - North only
+#------------------
+phylobj.N <- subset_samples(phylobj, Block=="N")
+plot_richness(phylobj.N, 
+              x = "Treatment", 
+              color = "Time_point", 
+              measures = c('Observed', 'Chao1', 'Shannon')) + 
+  geom_boxplot(alpha=.9) + theme_igray() +
+  theme(axis.text.x  = element_text(angle=90, vjust=0.5))+
+  scale_color_pander() + scale_fill_pander() +
+  ggtitle("Alpha Diversity - North block only")
+
+#Alpha Diversity Richness barplot - South only
+#------------------
+phylobj.S <- subset_samples(phylobj, Block=="S")
+plot_richness(phylobj.S, 
+              x = "Treatment", 
+              color = "Time_point", 
+              measures = c('Observed', 'Chao1', 'Shannon')) + 
+  geom_boxplot(alpha=.9) + theme_igray() +
+  theme(axis.text.x  = element_text(angle=90, vjust=0.5))+
+  scale_color_pander() + scale_fill_pander() +
+  ggtitle("Alpha Diversity - South block only")
+
+#Alpha diversity statistical analysis
+#This code could be used to identify 
+#------------------
+sample_data(phylobj.N) #Subsetted data for North grove only
+resultsN = estimate_richness(phylobj.N, measures = c("Shannon", "Observed", "InvSimpson", "Chao1"))
+view(resultsN)
+
+#observed for North grove
+pairwise.wilcox.test(resultsN$Observed, sample_data(phylobj.N)$Treatment)
+pairwise.wilcox.test(resultsN$Observed, sample_data(phylobj.N)$Time_point)
+#shannon for North grove
+pairwise.wilcox.test(resultsN$Shannon, sample_data(phylobj.N)$Treatment)
+pairwise.wilcox.test(resultsN$Shannon, sample_data(phylobj.N)$Time_point)
+#Inverse simpson N
+pairwise.wilcox.test(resultsN$InvSimpson, sample_data(phylobj.N)$Treatment)
+pairwise.wilcox.test(resultsN$InvSimpson, sample_data(phylobj.N)$Time_point)
+#Chao1 for North grove
+pairwise.wilcox.test(resultsN$Chao1, sample_data(phylobj.N)$Treatment)
+pairwise.wilcox.test(resultsN$Chao1, sample_data(phylobj.N)$Time_point)
+
+sample_data(phylobj.S) #Subsetted data for South grove only
+resultsS = estimate_richness(phylobj.S, measures = c("Shannon", "Observed", "InvSimpson", "Chao1"))
+view(resultsS)
+
+#observed for South grove
+pairwise.wilcox.test(resultsS$Observed, sample_data(phylobj.S)$Treatment)
+pairwise.wilcox.test(resultsS$Observed, sample_data(phylobj.S)$Time_point)
+#shannon for South grove
+pairwise.wilcox.test(resultsS$Shannon, sample_data(phylobj.S)$Treatment)
+pairwise.wilcox.test(resultsS$Shannon, sample_data(phylobj.S)$Time_point)
+#Inverse simpson for South grove
+pairwise.wilcox.test(resultsS$InvSimpson, sample_data(phylobj.S)$Treatment)
+pairwise.wilcox.test(resultsS$InvSimpson, sample_data(phylobj.S)$Time_point)
+#Chao1 for South grove
+pairwise.wilcox.test(resultsS$Chao1, sample_data(phylobj.S)$Treatment)
+pairwise.wilcox.test(resultsS$Chao1, sample_data(phylobj.S)$Time_point)
