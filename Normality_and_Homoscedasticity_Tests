@@ -1,0 +1,101 @@
+#Code designed to test the normality and homoscedasticity of citrus harvest yield data 
+#Samples organized in an Excel spreadsheet, with samples in rows and treatment, year, and yield data in columns
+
+#Install packages
+#-----------------------------
+install.packages("knitr")
+install.packages("tidyverse")
+install.packages("ggplot2")
+install.packages("ggthemes")
+install.packages("dplyr")
+install.packages("readxl")
+install.packages("devtools")
+if(!require(devtools)) install.packages("devtools")
+devtools::install_github("kassambara/ggpubr")
+install.packages("ggpubr")
+
+#Load libraries
+#-----------------------------
+library(knitr)
+library(tidyverse)
+library(ggplot2)
+library(ggthemes)
+library(dplyr)
+library(readxl)
+library(devtools)
+library(ggpubr)
+
+#File paths
+#-----------------------------
+opts_knit$set(root.dir = normalizePath("C:/Users/rachelberner/Desktop/CRDF Cover Crop harvest"))
+setwd("C:/Users/rachelberner/Desktop/CRDF Cover Crop harvest") 
+harvest2 <- read_excel(("C:/Users/rachelberner/Desktop/CRDF cover crop harvest/Excel_Rachel.xlsx"), col_names=TRUE)
+view(harvest2)
+colSums(is.na(harvest2))
+
+#Visualizing Distribution of Data Using Density and Quantile-Quantile Plots
+#-----------------------------
+#2019 density
+ggdensity(harvest2$Yield_lbs_2019,
+          main = "Density plot of fruit weight per tree (lbs) 2019",
+          xlab = "Fruit weight per tree (lbs)")
+#2019 Q-Q plot (or quantile-quantile plot) draws the correlation between a given sample and the normal distribution. A 45-degree reference line is also plotted.
+ggqqplot(harvest2$Yield_lbs_2019, 
+         main = "quantile-quantile plot comparing our data with a normal distribution 2019",
+         ylab = "Fruit weight per tree (lbs)")
+#2020 density
+ggdensity(harvest2$Yield_lbs_2020,
+          main = "Density plot of fruit weight per tree (lbs) 2020",
+          xlab = "Fruit weight per tree (lbs)")
+#2020 Q-Q plot (or quantile-quantile plot) draws the correlation between a given sample and the normal distribution. A 45-degree reference line is also plotted.
+ggqqplot(harvest2$Yield_lbs_2020, 
+         main = "quantile-quantile plot comparing our data with a normal distribution 2020",
+         ylab = "Fruit weight per tree (lbs)")
+
+#Shapiro-Wilk Normality Test
+#p<0.05 indicates that the null hypothesis of normality must be rejected, only non-parametric statistical tests should be used
+#-----------------------------
+shapiro.test(harvest2$Yield_lbs_2019)
+shapiro.test(harvest2$Yield_lbs_2020)
+
+#Bartlett Test for Homogeneity of Variances 
+#For data that has confirmed normality, this test is used to check that variances are equal for all samples
+#This test is sensitive to deviations in normality and should not be used for non-normally distributed data
+#p<0.05 indicates that the null hypothesis of normality must be rejected, only non-parametric statistical analysis tests should be used
+#-----------------------------
+#replicate
+bartlett.test(harvest2$Yield_lbs_2019, harvest2$rep, data=harvest2)
+bartlett.test(harvest2$Yield_lbs_2020, harvest2$rep, data=harvest2)
+
+#treatment
+bartlett.test(harvest2$Yield_lbs_2019, harvest2$Treatment, data=harvest2)
+bartlett.test(harvest2$Yield_lbs_2020, harvest2$Treatment, data=harvest2)
+
+#location 2019
+bartlett.test(harvest2$Yield_lbs_2019, harvest2$location, data=harvest2)
+
+#Levene homoscedasticity test
+#For data that has confirmed non-normality, this test is used to check that variances are equal for all samples
+#This test is less sensitive to deviations in normality than the Bartlett test, and should be used for non-normally distributed data
+#p<0.05 indicates that the null hypothesis of homoscedasticity must be rejected, only non-parametric statistical analysis tests should be used
+#-----------------------------
+#install.packages("car")
+library(car)
+
+leveneTest(Yield_lbs_2019 ~ as.character(rep), data=harvest2)
+leveneTest(Yield_lbs_2019 ~ as.character(Treatment), data=harvest2)
+leveneTest(Yield_lbs_2019 ~ as.character(location), data=harvest2)
+
+leveneTest(Yield_lbs_2020 ~ as.character(rep), data=harvest2)
+leveneTest(Yield_lbs_2020 ~ as.character(Treatment), data=harvest2)
+
+#levene test, treatment and replicate combined into 1 column
+leveneTest(Yield_lbs_2019 ~ sample_id, data=harvest2)
+leveneTest(Yield_lbs_2020 ~ sample_id, data=harvest2)
+leveneTest(Yield_lbs_2020*Yield_lbs_2019 ~ sample_id, data=harvest2)
+
+#If the data are normally distributed and homoscedastic, parametric analyses are appropriate
+#If the data are not normally distributed and heteroscedastic, non-parametric analyses are appropriate
+#-Wilcoxon Test is a non-parametric alternative to a T-Test for heteroscedastic data
+#-Kruskall-Wallis is a non-parametric alternative to ANOVA for heteroscedastic data which can be used with Wilcoxon Test (Mann-Whitney U Rank-Sum) as a post-hoc
+
